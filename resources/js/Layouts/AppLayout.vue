@@ -14,6 +14,11 @@ import { Link, Head } from '@inertiajs/vue3'
         <Link href="/" class="font-semibold">โปรแกรมของหัวหน้ามิลค์</Link>
         <nav class="flex items-center gap-4 text-sm text-gray-600">
           <Link href="/reports/top-diagnosis" class="hover:text-gray-900">ต่างด้าวสิทAL</Link>
+          <Link href="/reports/top-accident" class="hover:text-gray-900">Topอุบัติเหตุ AL</Link>
+          <Link href="/reports/top-accident-sss" class="hover:text-gray-900">Top โรคสิทธ์ประกันสังคม</Link>
+          <Link href="/reports/top-diagnosis-sss" class="hover:text-gray-900">Topอุบัติเหตุ สิทธ์ประกันสังคม</Link>
+          <Link href="/reports/top-icd9-ortho-sss" class="hover:text-gray-900">5อันดับ สิทธ์ประกันสังคม แผนกกระดูก</Link>
+
         </nav>
       </div>
     </header>
