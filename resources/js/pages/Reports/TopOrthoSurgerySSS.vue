@@ -34,7 +34,7 @@ const exportFile = computed(() => {
   const d = new Date()
   const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
   const m = (mode.value || 'all').toUpperCase()
-  return `ORTHO_SSS_OPS_${m}_${stamp}`
+  return `ORTHO_SSS_ICD9_${m}_${stamp}`
 })
 
 const dt = ref()
@@ -123,53 +123,53 @@ fetchData()
 
     <!-- Result -->
     <div class="rounded-xl border bg-white p-3">
-      <DataTable
-        :value="items"
-        :loading="isLoading"
-        dataKey="op_name"
-        responsiveLayout="scroll"
-        ref="dt"
-        :exportFilename="exportFile"
-      >
-        <!-- Header + Export -->
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <div class="font-medium">Export</div>
-              <div class="text-[12px] text-zinc-500">DataTable can export its data to CSV format.</div>
-            </div>
-            <Button icon="pi pi-external-link" label="Export CSV" @click="exportCSV" />
-          </div>
-        </template>
+  <DataTable
+    :value="items"
+    :loading="isLoading"
+    dataKey="icd9_code"
+    responsiveLayout="scroll"
+    ref="dt"
+    :exportFilename="exportFile"
+  >
+    <template #header>
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <div class="font-medium">Export</div>
+          <div class="text-[12px] text-zinc-500">DataTable can export its data to CSV format.</div>
+        </div>
+        <Button icon="pi pi-external-link" label="Export CSV" @click="exportCSV" />
+      </div>
+    </template>
 
-        <Column header="#" :body="(_, opt) => opt.rowIndex + 1" style="width:70px" :exportable="false" />
-        <Column field="op_name" header="หัตถการ" exportHeader="หัตถการ" />
+    <Column header="#" :body="(_, opt) => opt.rowIndex + 1" style="width:70px" :exportable="false" />
+    <Column field="icd9_code" header="ICD-9" exportHeader="ICD-9" />
+    <Column field="icd9_name" header="ชื่อหัตถการ (ไทย)" exportHeader="ชื่อหัตถการ (ไทย)" />
 
-        <Column
-          v-if="mode !== 'ipd'"
-          field="opd_cases"
-          header="OPD"
-          style="width:120px"
-          exportHeader="OPD"
-          :body="row => row.opd_cases?.toLocaleString?.() ?? row.opd_cases"
-        />
-        <Column
-          v-if="mode !== 'opd'"
-          field="ipd_cases"
-          header="IPD"
-          style="width:120px"
-          exportHeader="IPD"
-          :body="row => row.ipd_cases?.toLocaleString?.() ?? row.ipd_cases"
-        />
-        <Column
-          v-if="mode === 'all'"
-          field="total_cases"
-          header="รวม"
-          style="width:120px"
-          exportHeader="รวม"
-          :body="row => row.total_cases?.toLocaleString?.() ?? row.total_cases"
-        />
-      </DataTable>
-    </div>
+    <Column
+      v-if="mode !== 'ipd'"
+      field="opd_cases"
+      header="OPD"
+      style="width:120px"
+      exportHeader="OPD"
+      :body="row => row.opd_cases?.toLocaleString?.() ?? row.opd_cases"
+    />
+    <Column
+      v-if="mode !== 'opd'"
+      field="ipd_cases"
+      header="IPD"
+      style="width:120px"
+      exportHeader="IPD"
+      :body="row => row.ipd_cases?.toLocaleString?.() ?? row.ipd_cases"
+    />
+    <Column
+      v-if="mode === 'all'"
+      field="total_cases"
+      header="รวม"
+      style="width:120px"
+      exportHeader="รวม"
+      :body="row => row.total_cases?.toLocaleString?.() ?? row.total_cases"
+    />
+  </DataTable>
+</div>
   </div>
 </template>
