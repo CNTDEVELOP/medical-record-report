@@ -30,7 +30,7 @@ const exportFile = computed(() => {
   const pad = (n) => String(n).padStart(2, '0')
   const d = new Date()
   const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
-  return `ICD9_ORTHO_ALA7A8_${stamp}`
+  return `ICD10_ORTHO_ALA7A8_${stamp}`
 })
 const dt = ref()
 const exportCSV = () => dt.value?.exportCSV({ filename: exportFile.value })
@@ -65,7 +65,7 @@ fetchData()
 <template>
   <div class="max-w-6xl mx-auto px-4 py-6">
     <h1 class="text-xl sm:text-2xl font-semibold text-zinc-800 mb-4">
-      ICD-9 หัตถการยอดนิยม 5 อันดับ — แผนกกระดูก (spclty=08) — สิทธิ AL,A7,A8
+      ICD-10 แผนกกระดูก ที่มีหัตถการผ่าตัดจริง (spclty=08) — สิทธิ AL,A7,A8
     </h1>
 
     <!-- Controls -->
@@ -104,14 +104,14 @@ fetchData()
     <!-- Result -->
     <div class="rounded-xl border bg-white p-3">
       <DataTable
-        :value="items"
-        :loading="isLoading"
-        dataKey="icd9_code"
-        responsiveLayout="scroll"
-        ref="dt"
-        :exportFilename="exportFile"
-      >
-        <template #header>
+  :value="items"
+  :loading="isLoading"
+  dataKey="icd10_code"
+  responsiveLayout="scroll"
+  ref="dt"
+  :exportFilename="exportFile"
+>
+<template #header>
           <div class="flex items-center justify-between gap-3">
             <div>
               <div class="font-medium">Export</div>
@@ -121,12 +121,13 @@ fetchData()
           </div>
         </template>
 
-        <Column header="#" :body="(_, opt) => opt.rowIndex + 1" style="width:70px" :exportable="false" />
-        <Column field="icd9_code" header="ICD-9" exportHeader="ICD-9" />
-        <Column field="icd9_name" header="ชื่อหัตถการ (ไทย)" exportHeader="ชื่อหัตถการ (ไทย)" />
-        <Column field="cases" header="จำนวนครั้ง" style="width:140px" exportHeader="จำนวนครั้ง"
-                :body="row => row.cases?.toLocaleString?.() ?? row.cases" />
-      </DataTable>
+  <Column header="#" :body="(_, opt) => opt.rowIndex + 1" style="width:70px" :exportable="false" />
+  <Column field="icd10_code" header="ICD-10" exportHeader="ICD-10" />
+  <Column field="icd10_name_th" header="ชื่อโรค (ไทย)" exportHeader="ชื่อโรค (ไทย)" />
+  <Column field="cases" header="จำนวนเคส" style="width:140px"
+          exportHeader="จำนวนเคส"
+          :body="row => row.cases?.toLocaleString?.() ?? row.cases" />
+</DataTable>
     </div>
   </div>
 </template>

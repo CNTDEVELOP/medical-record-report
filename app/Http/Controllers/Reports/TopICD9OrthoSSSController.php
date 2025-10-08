@@ -18,51 +18,142 @@ class TopICD9OrthoSSSController extends BaseController
     }
 
     public function index(Request $request)
-    {
-        try {
-            $start = $request->query('start');
-            $end   = $request->query('end');
-            $limit = (int) $request->query('limit', 5);
-            $limit = max(1, min($limit, 50));
+{
+    try {
+        $start = $request->query('start');
+        $end   = $request->query('end');
+        $mode  = strtolower($request->query('mode', 'all')); // all|opd|ipd
+        $limit = (int) $request->query('limit', 5);
+        $limit = max(1, min($limit, 50));
 
-            if (!$start || !$end) {
-                return $this->sendError('start/end is required', [], 422);
-            }
+        if (!$start || !$end) {
+            return $this->sendError('start/end is required', [], 422);
+        }
 
-            // สิทธิที่ต้องการ
-            $pcodes   = ['AL','A7','A8'];
-            $inPcodes = implode(',', array_fill(0, count($pcodes), '?'));
+        // สิทธิที่ต้องการ
+        $pcodes  = ['AL','A7','A8'];
+        $inCodes = implode(',', array_fill(0, count($pcodes), '?')); // ?,?,?
 
-            // ชื่อที่แสดงของรหัส (ถ้าไม่มี master ให้คืนว่าง)
+        /* -------------------- OPD ONLY (ICD-10 + มีผ่าตัดจริง) -------------------- */
+        if ($mode === 'opd') {
             $sql = "
                 SELECT
-                    t.icd9_code,
-                    COALESCE(i9.name, '') AS icd9_name,
+                    t.icd10_code,
+                    COALESCE(i.name,'') AS icd10_name_th,
                     t.cases
                 FROM (
                     SELECT
-                        d.icd10 AS icd9_code,
-                        COUNT(DISTINCT d.vn) AS cases
+                        d.icd10 AS icd10_code,
+                        COUNT(DISTINCT o.vn) AS cases
                     FROM ovst o
-                    JOIN pttype p   ON p.pttype = o.pttype AND p.pcode IN ($inPcodes)
-                    JOIN ovstdiag d ON d.vn = o.vn
-                    WHERE o.vstdate BETWEEN ? AND ?
-                      AND o.spclty = '08'              -- กระดูก
-                      AND TRIM(d.icd10) REGEXP '^[0-9]' -- ICD-9 only
+                    JOIN pttype p          ON p.pttype = o.pttype AND p.pcode IN ($inCodes)
+                    JOIN ovstdiag d        ON d.vn = o.vn
+                    JOIN operation_list ol ON ol.vn = o.vn
+                    WHERE ol.operation_date BETWEEN ? AND ?
+                      AND o.spclty = '08'                            -- แผนกกระดูก (OPD)
+                      AND TRIM(d.icd10) REGEXP '^[A-Za-z]'          -- ICD-10 เท่านั้น
+                      AND TRIM(d.icd10) <> ''
+                      AND TRIM(d.diagtype) = '1'                    -- Dx หลัก (ลบออกได้ถ้าไม่มีในฐาน)
                     GROUP BY d.icd10
                     ORDER BY cases DESC
                     LIMIT ?
                 ) t
-                LEFT JOIN icd9cm i9 ON i9.code = t.icd9_code
+                LEFT JOIN icd101 i ON i.code = t.icd10_code
                 ORDER BY t.cases DESC
             ";
-
             $bindings = array_merge($pcodes, [$start, $end, $limit]);
             $rows = DB::connection('mysql_252')->select($sql, $bindings);
-
             return $this->sendResponse($rows);
-        } catch (\Throwable $e) {
-            return $this->sendError($e->getMessage());
         }
+
+        /* -------------------- IPD ONLY (ICD-10 + มีผ่าตัดจริง) -------------------- */
+        if ($mode === 'ipd') {
+            $sql = "
+                SELECT
+                    t.icd10_code,
+                    COALESCE(i.name,'') AS icd10_name_th,
+                    t.cases
+                FROM (
+                    SELECT
+                        d.icd10 AS icd10_code,
+                        COUNT(DISTINCT ip.an) AS cases
+                    FROM iptdiag d
+                    JOIN ipt ip           ON ip.an = d.an
+                    JOIN pttype p         ON p.pttype = ip.pttype AND p.pcode IN ($inCodes)
+                    JOIN operation_list ol ON ol.an = ip.an
+                    WHERE ol.operation_date BETWEEN ? AND ?
+                      AND ol.send_depcode = '080'                     -- กระดูก (OR ส่งเข้ากระดูก)
+                      AND TRIM(d.icd10) REGEXP '^[A-Za-z]'            -- ICD-10
+                      AND TRIM(d.icd10) <> ''
+                      AND TRIM(d.diagtype) = '1'                      -- Dx หลัก
+                    GROUP BY d.icd10
+                    ORDER BY cases DESC
+                    LIMIT ?
+                ) t
+                LEFT JOIN icd101 i ON i.code = t.icd10_code
+                ORDER BY t.cases DESC
+            ";
+            $bindings = array_merge($pcodes, [$start, $end, $limit]);
+            $rows = DB::connection('mysql_252')->select($sql, $bindings);
+            return $this->sendResponse($rows);
+        }
+
+        /* -------------------- ALL (OPD + IPD) ICD-10 + มีผ่าตัดจริง -------------------- */
+        $sql = "
+            SELECT
+                x.icd10_code,
+                COALESCE(i.name,'') AS icd10_name_th,
+                (SUM(x.opd_cases) + SUM(x.ipd_cases)) AS cases
+            FROM (
+                /* OPD */
+                SELECT
+                    d.icd10 AS icd10_code,
+                    COUNT(DISTINCT o.vn) AS opd_cases,
+                    0 AS ipd_cases
+                FROM ovst o
+                JOIN pttype p          ON p.pttype = o.pttype AND p.pcode IN ($inCodes)
+                JOIN ovstdiag d        ON d.vn = o.vn
+                JOIN operation_list ol ON ol.vn = o.vn
+                WHERE ol.operation_date BETWEEN ? AND ?
+                  AND o.spclty = '08'
+                  AND TRIM(d.icd10) REGEXP '^[A-Za-z]'
+                  AND TRIM(d.icd10) <> ''
+                  AND TRIM(d.diagtype) = '1'
+                GROUP BY d.icd10
+
+                UNION ALL
+
+                /* IPD */
+                SELECT
+                    d.icd10 AS icd10_code,
+                    0 AS opd_cases,
+                    COUNT(DISTINCT ip.an) AS ipd_cases
+                FROM iptdiag d
+                JOIN ipt ip            ON ip.an = d.an
+                JOIN pttype p2         ON p2.pttype = ip.pttype AND p2.pcode IN ($inCodes)
+                JOIN operation_list ol2 ON ol2.an = ip.an
+                WHERE ol2.operation_date BETWEEN ? AND ?
+                  AND ol2.send_depcode = '080'
+                  AND TRIM(d.icd10) REGEXP '^[A-Za-z]'
+                  AND TRIM(d.icd10) <> ''
+                  AND TRIM(d.diagtype) = '1'
+                GROUP BY d.icd10
+            ) x
+            LEFT JOIN icd101 i ON i.code = x.icd10_code
+            GROUP BY x.icd10_code, icd10_name_th
+            ORDER BY cases DESC
+            LIMIT ?
+        ";
+        $bindings = array_merge(
+            $pcodes, [$start, $end],   // สำหรับซับคิวรี OPD
+            $pcodes, [$start, $end],   // สำหรับซับคิวรี IPD
+            [$limit]
+        );
+        $rows = DB::connection('mysql_252')->select($sql, $bindings);
+        return $this->sendResponse($rows);
+
+    } catch (\Throwable $e) {
+        return $this->sendError($e->getMessage());
     }
+}
 }
